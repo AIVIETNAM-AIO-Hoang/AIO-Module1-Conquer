@@ -4,6 +4,15 @@ from uuid import UUID
 from pydantic import BaseModel
 
 
+class Source(BaseModel):
+    """A source document chunk cited in a RAG answer."""
+
+    document_id: UUID
+    filename: str
+    content: str
+    score: float | None = None   # <-- thêm dòng này
+
+
 class UploadResponse(BaseModel):
     """Response body for POST /api/documents/upload."""
 

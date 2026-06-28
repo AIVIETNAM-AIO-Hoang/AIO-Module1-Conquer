@@ -67,6 +67,7 @@ def prompt(request: PromptRequest, session: Session = Depends(get_session)):
                 document_id=c["document_id"],
                 filename=c["filename"],
                 content=c["content"],
+                score=c["score"],
             )
             for c in chunks
         ],
