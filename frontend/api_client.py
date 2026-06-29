@@ -10,6 +10,22 @@ load_dotenv()
 _BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
 
 
+def check_health() -> bool:
+    """Check whether the API is reachable.
+ c
+    Pings a lightweight endpoint that does not depend on the database, so it
+    reflects API reachability rather than database state.
+ 
+    Returns:
+        True if the API responds, False if it cannot be reached.
+    """
+    try:
+        response = requests.get(f"{_BASE_URL}/openapi.json", timeout=2)
+        return response.status_code == 200
+    except requests.RequestException:
+        return False
+
+
 def upload_document(file_bytes: bytes, filename: str, content_type: str) -> dict:
     """Upload a document for chunking and embedding.
 
