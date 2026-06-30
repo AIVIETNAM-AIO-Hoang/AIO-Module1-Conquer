@@ -1,3 +1,4 @@
+import pytest
 import uuid
 from unittest.mock import patch
 
@@ -92,3 +93,73 @@ def test_delete_unknown_returns_404(client):
     """Deleting a non-existent document returns 404."""
     resp = client.delete(f"/api/documents/remove?document_id={uuid.uuid4()}")
     assert resp.status_code == 404
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Edge cases: empty file, Unicode, more unsupported types, 404 variants (added)
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def test_upload_empty_file_creates_zero_chunk_document(client):
+    """An empty file is accepted and produces a document with zero chunks.
+
+    Documents the current product behavior: there is no 'file must contain
+    text' guard, so an empty upload yields chunk_count == 0.
+    """
+    with patch(_PATCH_CHUNK, return_value=[]), patch(_PATCH_EMBED, return_value=FAKE_EMBEDDING):
+        resp = client.post(
+            "/api/documents/upload",
+            files={"file": ("empty.txt", b"", "text/plain")},
+        )
+    assert resp.status_code == 201
+    assert resp.json()["chunk_count"] == 0
+
+    listed = client.get("/api/documents/list").json()["documents"]
+    assert len(listed) == 1
+    assert listed[0]["chunk_count"] == 0
+
+
+def test_upload_preserves_unicode_filename(client):
+    """A Unicode filename round-trips through upload and list unchanged."""
+    name = "tài liệu — 日本語 🌍.txt"
+    resp = _upload(client, filename=name, content="Xin chào 🌍".encode("utf-8"))
+    assert resp.status_code == 201
+    assert resp.json()["filename"] == name
+
+    listed = client.get("/api/documents/list").json()["documents"]
+    assert listed[0]["filename"] == name
+
+
+@pytest.mark.parametrize(
+    "filename, content_type",
+    [
+        ("data.csv", "text/csv"),
+        ("image.png", "image/png"),
+        ("payload.json", "application/json"),
+        ("no_extension", "application/octet-stream"),
+    ],
+)
+def test_upload_various_unsupported_types_return_422(client, filename, content_type):
+    """A range of unsupported extensions / MIME types are rejected with 422."""
+    resp = client.post(
+        "/api/documents/upload",
+        files={"file": (filename, b"data", content_type)},
+    )
+    assert resp.status_code == 422
+
+
+def test_delete_twice_second_call_returns_404(client):
+    """Deleting an already-deleted document returns 404 the second time."""
+    doc_id = _upload(client).json()["document_id"]
+
+    first = client.delete(f"/api/documents/remove?document_id={doc_id}")
+    assert first.status_code == 200
+
+    second = client.delete(f"/api/documents/remove?document_id={doc_id}")
+    assert second.status_code == 404
+
+
+def test_delete_malformed_uuid_returns_422(client):
+    """A non-UUID document_id fails validation with 422, not 404."""
+    resp = client.delete("/api/documents/remove?document_id=not-a-uuid")
+    assert resp.status_code == 422

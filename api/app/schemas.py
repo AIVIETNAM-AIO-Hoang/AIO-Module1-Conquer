@@ -72,12 +72,12 @@ class PromptRequest(BaseModel):
     top_k: int = 5
 
 
-class Source(BaseModel):
-    """A source document chunk cited in a RAG answer."""
+# class Source(BaseModel):
+#     """A source document chunk cited in a RAG answer."""
 
-    document_id: UUID
-    filename: str
-    content: str
+#     document_id: UUID
+#     filename: str
+#     content: str
 
 
 class PromptResponse(BaseModel):
